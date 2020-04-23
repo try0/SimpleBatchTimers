@@ -8,6 +8,28 @@ namespace SimpleBatchTimers
     /// </summary>
     public abstract class BatchJobBase : IBatchJob
     {
+        private static readonly Type TYPE = typeof(BatchJobBase);
+        /// <summary>
+        /// Jobインスタンスを作成します。
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public static BatchJobBase CreateInstance(Type type)
+        {
+            if (!type.IsSubclassOf(TYPE))
+            {
+                throw new ArgumentException(TYPE.Name + "の派生クラスのTypeを指定してください。");
+            }
+            if (type.IsAbstract)
+            {
+                throw new ArgumentException("抽象クラスは指定できません");
+            }
+
+            BatchJobBase job = (BatchJobBase)Activator.CreateInstance(type);
+
+            return job;
+        }
+
         /// <summary>
         /// 
         /// </summary>

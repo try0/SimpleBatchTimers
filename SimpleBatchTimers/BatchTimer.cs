@@ -18,16 +18,16 @@ namespace SimpleBatchTimers
         public BatchTimer(BatchJobBase job, BatchJobConfigAttribute config = null)
         {
             this.BatchJob = job;
-            this.BatchConfig = config;
+            this.BatchConfig = (config == null) ? new BatchJobConfigAttribute() : config;
             this.Timer = new Timer(state =>
             {
                 var context = BatchJob.BatchJobContext;
 
-                if (BatchConfig != null && BatchConfig.LimitCount > BatchJobConfigAttribute.NO_LIMIT)
+                if (BatchConfig.LimitCount > BatchJobConfigAttribute.NO_LIMIT)
                 {
                     if (context.Count == BatchConfig.LimitCount)
                     {
-                        Pause();
+                        Stop();
                         return;
                     }
                 }
@@ -36,15 +36,15 @@ namespace SimpleBatchTimers
                 context.Count++;
                 BatchJob.Run();
                 context.LastExecutedDateTime = DateTime.Now;
-                
-            }, null, 0, GetIntervalAsMilliseconds());
+
+            }, null, Timeout.Infinite, Timeout.Infinite);
 
         }
 
         /// <summary>
         /// 処理をを一時停止します。
         /// </summary>
-        public void Pause()
+        public void Stop()
         {
             Timer.Change(Timeout.Infinite, Timeout.Infinite);
         }
@@ -52,9 +52,9 @@ namespace SimpleBatchTimers
         /// <summary>
         /// 処理を再稼働します。
         /// </summary>
-        public void Resume()
+        public void Start(int dueTime = 0)
         {
-            Timer.Change(0, GetIntervalAsMilliseconds());
+            Timer.Change(dueTime, GetIntervalAsMilliseconds());
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace SimpleBatchTimers
 
         public void Dispose()
         {
-            Pause();
+            Stop();
             Timer.Dispose();
             Timer = null;
             BatchConfig = null;

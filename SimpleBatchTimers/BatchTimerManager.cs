@@ -17,57 +17,158 @@ namespace SimpleBatchTimers
             STOPPED
         }
 
+        public static Func<Type, BatchJobBase> BatchJobFactory { get; set; } = type => BatchJobBase.CreateInstance(type);
+
         public static ManagerState State { get; private set; } = ManagerState.STOPPED;
 
-        internal static List<BatchTimer> BatchTimers = new List<BatchTimer>();
+        public static List<BatchTimer> BatchTimers = new List<BatchTimer>();
+
+
+        static Random random = new Random();
+        static object randomLock = new object();
+        private static int NewRandomSeconds(int min, int max)
+        {
+            lock (randomLock)
+            {
+                return random.Next(min, max);
+            }
+        }
+
+        /// <summary>
+        /// Jobを登録します。
+        /// </summary>
+        /// <param name="assemblies"></param>
+        /// <returns></returns>
+        public static ISet<Type> RegisterBatchJob(params Assembly[] assemblies)
+        {
+
+            ISet<Type> registeredJobs = new HashSet<Type>();
+
+            foreach (var assembly in assemblies)
+            {
+                Type[] types = assembly.GetTypes();
+
+                var registereTypes = RegisterJobs(types);
+                foreach (var t in registereTypes)
+                {
+                    registeredJobs.Add(t);
+                }
+            }
+
+            return registeredJobs;
+        }
+
+        /// <summary>
+        /// Jobを登録します。
+        /// </summary>
+        /// <param name="types"></param>
+        /// <returns></returns>
+        public static ISet<Type> RegisterJobs(params Type[] types)
+        {
+
+            ISet<Type> registeredJobs = new HashSet<Type>();
+            foreach (var type in types)
+            {
+
+                if (type.IsSubclassOf(typeof(BatchJobBase)) && !type.IsAbstract)
+                {
+                    BatchJobBase job = BatchJobFactory.Invoke(type);
+                    BatchJobConfigAttribute config = (BatchJobConfigAttribute)Attribute.GetCustomAttribute(type, typeof(BatchJobConfigAttribute));
+
+                    RegisterJobs(Tuple.Create(job, config));
+                    registeredJobs.Add(type);
+                }
+            }
+
+            return registeredJobs;
+        }
+
+        /// <summary>
+        /// Jobを登録します。
+        /// </summary>
+        /// <param name="jobs"></param>
+        public static void RegisterJobs(params Tuple<BatchJobBase, BatchJobConfigAttribute>[] jobs)
+        {
+            foreach (var job in jobs)
+            {
+                var timer = new BatchTimer(job.Item1, job.Item2);
+                BatchTimers.Add(timer);
+            }
+        }
+
+        /// <summary>
+        /// Jobを登録します。
+        /// </summary>
+        /// <param name="jobs"></param>
+        public static void RegisterJobs(params BatchJobBase[] jobs)
+        {
+            foreach (var job in jobs)
+            {
+                var timer = new BatchTimer(job);
+                BatchTimers.Add(timer);
+            }
+        }
+
+        /// <summary>
+        /// 呼び出し元Assemblyに定義されたJobを登録します。
+        /// </summary>
+        public static void RegisterJobs()
+        {
+            var assembly = Assembly.GetCallingAssembly();
+            RegisterBatchJob(assembly);
+        }
 
         /// <summary>
         /// 処理を稼働します。
         /// </summary>
         public static void Start()
         {
-            var assembly = Assembly.GetCallingAssembly();
-
-            Start(assembly);
+            Start(0, 0);
         }
 
         /// <summary>
         /// 処理を稼働します。
         /// </summary>
-        /// <param name="assemblies"></param>
-        public static void Start(params Assembly[] assemblies)
+        /// <param name="min">遅延実行　乱数最小値</param>
+        /// <param name="max">遅延実行　乱数最大値</param>
+        public static void Start(int min, int max)
         {
-            foreach (var assembly in assemblies)
+            if (min < 0 || max < 0)
             {
-                Type[] ts = assembly.GetTypes();
+                throw new ArgumentException("遅延実行　乱数は0以上を指定してください。");
+            }
 
-                foreach (var type in ts)
+            if (State != ManagerState.WOARKING)
+            {
+                if (!BatchTimers.Any())
                 {
+                    var assembly = Assembly.GetCallingAssembly();
+                    RegisterBatchJob(assembly);
+                }
 
-
-                    if (type.IsSubclassOf(typeof(BatchJobBase)))
-                    {
-                        BatchJobBase job = (BatchJobBase)Activator.CreateInstance(type);
-
-                        BatchJobConfigAttribute config = (BatchJobConfigAttribute)Attribute.GetCustomAttribute(type, typeof(BatchJobConfigAttribute));
-
-                        BatchTimers.Add(new BatchTimer(job, config));
-                    }
+                if (min == 0 && max == 0)
+                {
+                    BatchTimers.ForEach(b => b.Start());
+                }
+                else
+                {
+                    // 遅延実行
+                    BatchTimers.ForEach(b => b.Start(NewRandomSeconds(min, max)));
                 }
 
             }
 
-
             UpdateState();
-
         }
+
+
 
         /// <summary>
         /// 処理を一時停止します。
         /// </summary>
         public static void Pause()
         {
-            Parallel.ForEach(BatchTimers, batchTimer => batchTimer.Pause());
+            Parallel.ForEach(BatchTimers, batchTimer => batchTimer.Stop());
 
 
             UpdateState();
@@ -88,7 +189,7 @@ namespace SimpleBatchTimers
             {
                 if (timer.GetType() == batchType)
                 {
-                    timer.Pause();
+                    timer.Stop();
                     return;
                 }
 
@@ -103,7 +204,7 @@ namespace SimpleBatchTimers
         /// </summary>
         public static void Resume()
         {
-            Parallel.ForEach(BatchTimers, batchTimer => batchTimer.Resume());
+            Parallel.ForEach(BatchTimers, batchTimer => batchTimer.Start());
 
 
             UpdateState();
@@ -124,7 +225,7 @@ namespace SimpleBatchTimers
             {
                 if (timer.GetType() == batchType)
                 {
-                    timer.Resume();
+                    timer.Start();
                     return;
                 }
             }
