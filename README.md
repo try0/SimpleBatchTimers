@@ -11,6 +11,22 @@ public class TestJob : BatchJobBase
     }
 }
 ```
+```C#
+[BatchJobConfig(TimeUnit = TimeUnit.SECOND, Interval = 5, InvokeMethodName = "Execute")]
+public class DelegateeJob
+{
+
+    public DelegateeJob()
+    {
+    }
+
+    public void Execute()
+    {
+        Debug.WriteLine("DelegateeJob Execute");
+    }
+
+}
+```
 
 ```C#
 BatchTimerManager.RegisterJobs();
