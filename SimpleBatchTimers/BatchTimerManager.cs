@@ -70,14 +70,31 @@ namespace SimpleBatchTimers
             foreach (var type in types)
             {
 
+                BatchJobConfigAttribute config = (BatchJobConfigAttribute)Attribute.GetCustomAttribute(type, typeof(BatchJobConfigAttribute));
+
                 if (type.IsSubclassOf(typeof(BatchJobBase)) && !type.IsAbstract)
                 {
                     BatchJobBase job = BatchJobFactory.Invoke(type);
-                    BatchJobConfigAttribute config = (BatchJobConfigAttribute)Attribute.GetCustomAttribute(type, typeof(BatchJobConfigAttribute));
-
                     RegisterJobs(Tuple.Create(job, config));
                     registeredJobs.Add(type);
                 }
+                else {
+
+                    if (config == null)
+                    {
+                        continue;
+                    }
+
+                    if(!type.IsAbstract)
+                    {
+                        BatchJobBase job = new DelegateBatchJob(type, config);
+                        RegisterJobs(Tuple.Create(job, config));
+                        registeredJobs.Add(type);
+                    }
+
+                }
+
+                
             }
 
             return registeredJobs;

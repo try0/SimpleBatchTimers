@@ -25,6 +25,11 @@ namespace SimpleBatchTimers
         public int LimitCount { get; set; } = NO_LIMIT;
 
         /// <summary>
+        /// 実行メソッド名
+        /// </summary>
+        public string InvokeMethodName { get; set; } = "Run";
+
+        /// <summary>
         /// 実行間隔をミリ秒で取得します。
         /// </summary>
         /// <returns></returns>
