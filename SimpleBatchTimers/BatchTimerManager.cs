@@ -26,11 +26,11 @@ namespace SimpleBatchTimers
 
         static Random random = new Random();
         static object randomLock = new object();
-        private static int NewRandomSeconds(int min, int max)
+        private static int NewRandomSeconds(int minSec, int maxSec)
         {
             lock (randomLock)
             {
-                return random.Next(min, max);
+                return random.Next(minSec, maxSec) * 1000;
             }
         }
 
@@ -146,11 +146,11 @@ namespace SimpleBatchTimers
         /// <summary>
         /// 処理を稼働します。
         /// </summary>
-        /// <param name="min">遅延実行　乱数最小値</param>
-        /// <param name="max">遅延実行　乱数最大値</param>
-        public static void Start(int min, int max)
+        /// <param name="minSec">遅延実行　乱数最小値</param>
+        /// <param name="maxSec">遅延実行　乱数最大値</param>
+        public static void Start(int minSec, int maxSec)
         {
-            if (min < 0 || max < 0)
+            if (minSec < 0 || maxSec < 0)
             {
                 throw new ArgumentException("遅延実行　乱数は0以上を指定してください。");
             }
@@ -163,14 +163,14 @@ namespace SimpleBatchTimers
                     RegisterBatchJob(assembly);
                 }
 
-                if (min == 0 && max == 0)
+                if (minSec == 0 && maxSec == 0)
                 {
                     BatchTimers.ForEach(b => b.Start());
                 }
                 else
                 {
                     // 遅延実行
-                    BatchTimers.ForEach(b => b.Start(NewRandomSeconds(min, max)));
+                    BatchTimers.ForEach(b => b.Start(NewRandomSeconds(minSec, maxSec)));
                 }
 
             }
